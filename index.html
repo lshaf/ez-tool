@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mine</title>
+    <style>
+        body {
+            margin: 10px;
+        }
+        #main-container {
+            font-size: 32px;
+            font-family: Ubuntu;
+            max-width: 1200px;
+            margin: auto;
+        }
+        .mining-timer {
+            top: 137px;
+        }
+        #table-container {
+            margin-top: 10px;
+        }
+        #table-data {
+            width: 100%;
+        }
+        .table {
+            width: 100%;
+            font-size: 14px;
+            border-collapse: collapse;
+        }
+        .table tr th, .table tr td {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: center;
+            width: 50%;
+        }
+        .other-info {
+            font-size: 26px
+        }
+        .other-info .account-info span {
+            float: right;
+        }
+        .other-info .account-info:nth-child(4) {
+            margin-top: 20px;
+        }
+        .small-info {
+            text-align: right;
+            font-size: 14px;
+        }
+        .data-container {
+            max-width: 800px;
+            width: 100%;
+            display: flex;
+            justify-content: space-evenly;
+            margin: auto;
+        }
+        .data-container > div {
+            min-width: 200px;
+        }
+        @media (max-width: 550px) {
+            .data-container {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        <div id="error" style="display: none">?user={wallet_wax} wajib</div>
+        <div id="mining-graph" style="display: block;">
+            <div id="graph-container" class="data-container">
+                <div class="main-information">
+                    <div class="information">
+                        <div id="planet"></div>
+                        <div id="value">0</div>
+                    </div>
+                    <div class="information mining-timer">
+                        <div>Mining</div>
+                        <div id="cooldown"></div>
+                        <audio src="alarm.wav" id="alarm"></audio>
+                    </div>
+                </div>
+                <div class="other-info">
+                    <div class="account-info">
+                        CPU <span id="cpu-usage"></span>
+                        <div class="cpu-number small-info">0 / 0</div>
+                    </div>
+                    <div class="account-info">
+                        NET <span id="net-usage"></span>
+                    </div>
+                    <div class="account-info">
+                        RAM <span id="ram-usage"></span>
+                    </div>
+                    <div class="account-info">
+                        TLM <span id="tlm-fetch">0 TLM</span>
+                    </div>
+                    <div class="account-info">
+                        MINE <span id="mine-count">0</span>
+                    </div>
+                </div>
+            </div>
+            <div id="table-container" class="data-container">
+                <div id="table-data">
+                    <table class="table" id="template">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>TLM</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="d-time"></td>
+                                <td class="d-tlm"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        const WAX_HOST = "https://wax.pink.gg";
+        const LOG_ENDPOINT = 'https://api.alienworlds.io/v1/alienworlds/mines'
+
+        function fetchLog(wallet, date, success) {
+            let prev = new Date(date);
+            prev.setDate(prev.getDate() - 1);
+            let m = String(prev.getMonth() + 1).padStart(2, 0);
+            let d = String(prev.getDate()).padStart(2, 0);
+            let strDate = prev.getFullYear() + `-${m}-${d}`;
+
+            $.ajax({
+                type: "GET",
+                url: LOG_ENDPOINT,
+                data: {
+                    miner: wallet,
+                    limit: 400,
+                    sort: 'desc',
+                    from: strDate + 'T17:00:00.000Z',
+                    to: date + 'T16:59:59.999Z'
+                },
+                dataType: 'json',
+                crossDomain: true,
+                async: false,
+                success: success
+            })
+        }
+
+        function fetchAccount(wallet, success) {
+            $.ajax({
+                type: 'POST',
+                url: WAX_HOST + "/v1/chain/get_account",
+                data: JSON.stringify({"account_name":wallet}),
+                dataType: 'json',
+                headers: {'content-type': 'application/json'},
+                crossDomain: true,
+                async: false,
+                success: success
+            })
+        }
+
+        function fetchTableRow(wallet, scope, table, success) {
+            $.ajax({
+                type: "POST",
+                url: WAX_HOST + "/v1/chain/get_table_rows",
+                data: JSON.stringify({
+                    "json":true,
+                    "code":"m.federation",
+                    "scope":scope,
+                    "table":table,
+                    "table_key":"",
+                    "lower_bound":wallet,
+                    "upper_bound":wallet,
+                    "index_position":1,
+                    "key_type":"",
+                    "limit":10,
+                    "reverse":false,
+                    "show_payer":false
+                }),
+                dataType: 'json',
+                headers: {'content-type': 'application/json'},
+                crossDomain: true,
+                async: false,
+                success: success
+            });
+        }
+
+        function fetchAsset(id, success) {
+            $.ajax({
+                url: "https://wax.api.atomicassets.io/atomicassets/v1/assets/" + id,
+                dataType: 'json',
+                type: "GET",
+                success: success,
+                crossDomain: true,
+                async: false,
+            })
+        }
+
+        function getWorld(world, success) {
+            return fetchTableRow("", world + '.world', 'state3', success);
+        }
+
+        function playAlarm() {
+            let player = document.getElementById("alarm");
+            player.pause();
+            player.currentTime = 0;
+            player.play();
+        }
+    </script>
+    <script>
+    </script>
+    <script>
+        const QUERY = new URLSearchParams(window.location.search);
+        const USERNAME = QUERY.get('user');
+
+        const LIMIT_ALARM = 2;
+        const MAX_COUNTER = 35;
+        const ALL_DATA = [];
+        const DISABLE_GRAPH = true;
+
+        var WARN_COUNTER = 0;
+        var LAND_DELAY = 0;
+        var ITEM_DELAY = 0;
+        var LAST_MINE = null;
+        var GLOBAL_GRAPH = null;
+        var UPDATE_TABLE = true;
+        var UPDATE_GRAPH = false;
+
+        const strBodyTable = $("#template tbody tr").prop('outerHTML');
+        $("#template tbody").empty();
+
+        function updateAccount() {
+            fetchAccount(USERNAME, r => {
+                let _cpu = r.cpu_limit;
+                let _net = r.net_limit;
+                $("#cpu-usage").html(Math.ceil(_cpu.used / _cpu.max * 100) + " %");
+                $(".cpu-number").html(`${_cpu.used.toLocaleString()} / ${_cpu.max.toLocaleString()}`);
+                $("#net-usage").html(Math.ceil(_net.used / _net.max * 100) + " %");
+                $("#ram-usage").html(Math.ceil(r.ram_usage / r.ram_quota * 100) + " %");
+
+                setTimeout(updateAccount, 5000);
+            });
+        }
+
+        function updateGain() {
+            UPDATE_TABLE = false;
+            let now = new Date();
+            let strDate = now.getFullYear();
+            strDate += "-" + String(now.getMonth() + 1).padStart(2, 0);
+            strDate += "-" + String(now.getDate()).padStart(2, 0);
+            fetchLog(USERNAME, strDate, r => {
+                $("#template tbody").empty();
+                $("#mine-count").html(r.results.length);
+
+                let totalMine = 0;
+                for (let mining of r.results) {
+                    let bd = $(strBodyTable);
+                    let mine_time = new Date(mining.block_timestamp);
+                    let strMineTime = mine_time.toLocaleTimeString();
+                    let strMineDate = mine_time.toLocaleDateString('jpn', {dateStyle: 'medium'});
+
+                    bd.find(".d-tlm").html(String(mining.bounty / 10000).padEnd(6, 0) + " TLM");
+                    bd.find(".d-time").html(strMineTime + " - " + strMineDate);
+                    $("#template tbody").append(bd);
+
+                    totalMine += mining.bounty;
+                }
+
+                if (r.results.length == 0) {
+                    $("#template tbody").html('<tr><td colspan=2 style="text-align:center">No Data</td></tr>');
+                }
+                
+                $("#tlm-fetch").html(String(totalMine / 10000));
+            });
+        }
+
+        function setGlobalWorld(r) {
+            let landName = r.data.name;
+            let [land, planet] = landName.split(' on ');
+            LAND_DELAY = r.data.data.delay / 10;
+
+            $("#planet").html(planet + " World"); 
+
+            GLOBAL_GRAPH = setInterval(function() {
+                if (!UPDATE_GRAPH) return true;
+                getWorld(planet.toLowerCase(), function(r) {
+                    let data = r.rows[0];
+                    $("#value").html(data.mine_bucket);
+
+                    if (DISABLE_GRAPH === false) {
+                        let value = Number(data.mine_bucket.replace(" TLM", ""));
+                        ALL_DATA.push(value);
+    
+                        if (ALL_DATA.length > MAX_COUNTER) {
+                            ALL_DATA.shift();
+                        }
+                    }
+                });
+            }, 1000);
+        }
+
+        function runTimer() {
+            if (LAST_MINE === null || ITEM_DELAY === 0 || LAND_DELAY === 0) {
+                setTimeout(runTimer, 500);
+                return false;
+            }
+
+            let currentTime = new Date();
+            let offsetDelay = ITEM_DELAY * LAND_DELAY * 1000;
+            let dtLastMine = new Date(LAST_MINE + "+0000");
+            dtLastMine.setTime(dtLastMine.getTime() + offsetDelay);
+
+            let cooldown = Math.floor((dtLastMine.getTime() - currentTime.getTime()) / 1000);
+            if (cooldown <= 0) {
+                document.getElementById('cooldown').innerText = '00:00:00';
+                if (WARN_COUNTER < LIMIT_ALARM) playAlarm();
+                UPDATE_GRAPH = true;
+                UPDATE_TABLE = true;
+                WARN_COUNTER++;
+
+                fetchTableRow(USERNAME, 'm.federation', 'miners', function(r) {
+                    let data = r.rows[0];
+                    LAST_MINE = data.last_mine;
+                    setTimeout(runTimer, 3000);
+                });
+            } else {
+                UPDATE_GRAPH = false;
+                if (UPDATE_TABLE) updateGain();
+                WARN_COUNTER = 0;
+                let hour_left = String(Math.floor(cooldown / 3600)).padStart(2, '0');
+                let min_left = String(Math.floor((cooldown % 3600) / 60)).padStart(2, '0');
+                let sec_left = String(Math.floor(cooldown % 60)).padStart(2, '0');
+                let string_left = `${hour_left}:${min_left}:${sec_left}`;
+                document.getElementById('cooldown').innerText = string_left;
+                setTimeout(runTimer, 250);
+            }
+        }
+
+        (() => {
+            if (USERNAME === null) return false;
+
+            document.getElementById("error").style = 'display: none;'
+            document.getElementById("mining-graph").style = 'display: inherit;'
+            fetchTableRow(USERNAME, 'm.federation', 'miners', function(r) {
+                let data = r.rows[0];
+                let landID = data.current_land;
+
+                if (GLOBAL_GRAPH === null) fetchAsset(landID, setGlobalWorld);
+                LAST_MINE = data.last_mine;
+            });
+
+            fetchTableRow(USERNAME, 'm.federation', 'bags', function(r) {
+                let data = r.rows[0];
+                
+                let promises = [];
+                for (let itemId of data.items) {
+                    promises.push(new Promise((resolve) => {
+                        fetchAsset(itemId, resolve);
+                    }))
+                }
+
+                Promise.all(promises).then((assets) => {
+                    let delays = [];
+                    for (let asset of assets) {
+                        delays.push(asset.data.data.delay);
+                    }
+
+                    delays.sort((a, b) => a - b).reverse();
+                    if (delays.length > 2) {
+                        delays = delays.slice(0, 2);
+                    }
+
+                    ITEM_DELAY = delays.reduce((a, b) => a + b);
+                });
+            });
+
+            runTimer();
+            updateAccount();
+        })()
+    </script>
+</body>
+</html>
