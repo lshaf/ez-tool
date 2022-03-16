@@ -1,0 +1,2 @@
+# ez-tool
+DO YOUR OWN RESEARCH
