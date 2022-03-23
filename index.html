@@ -157,6 +157,10 @@
                             </tr>
                         </thead>
                         <tbody>
+                            <tr>
+                                <td class="d-time"></td>
+                                <td class="d-cpu"></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -258,9 +262,7 @@
 
         const LIMIT_ALARM = 2;
         const MAX_COUNTER = 35;
-        const ALL_DATA = [];
         const ALL_CPU = [];
-        const DISABLE_GRAPH = true;
 
         var WARN_COUNTER = 0;
         var LAND_DELAY = 0;
@@ -275,21 +277,23 @@
         const strBodyTable = $("#template tbody tr").prop('outerHTML');
         $("#template tbody").empty();
 
+        const strBodyCpuTable = $("#cpu-table tbody tr").prop('outerHTML');
+        $("#cpu-table tbody").empty();
+
         function refreshCPUTable() {
             $("#cpu-table tbody").empty();
             let MIN_TH = CPU_STAKED_TH / 2;
             for (let cpu of ALL_CPU) {
-                let bd = $(strBodyTable);
+                let bd = $(strBodyCpuTable);
                 let strMineTime = cpu.time.toLocaleTimeString();
-                let strMineDate = cpu.time.toLocaleDateString('jpn', {dateStyle: 'medium'});
 
-                bd.find(".d-tlm").html(cpu.cpu.toLocaleString());
-                bd.find(".d-time").html(strMineTime + " - " + strMineDate);
+                bd.find(".d-cpu").html(cpu.cpu.toLocaleString());
+                bd.find(".d-time").html(strMineTime);
 
                 let color_indicator = 512;
-                if (cpu <= MIN_TH) {
+                if (cpu.cpu <= MIN_TH) {
                     color_indicator = 0;
-                } else if (cpu >= CPU_STAKED_TH) {
+                } else if (cpu.cpu >= CPU_STAKED_TH) {
                     color_indicator = 512;
                 } else {
                     let gap_cpu = cpu.cpu - MIN_TH;
@@ -306,7 +310,7 @@
                     color_green += color_decider;
                 }
 
-                bd.find(".d-tlm").css({'backgroundColor': `rgb(${color_red}, ${color_green}, 0)`})
+                bd.find(".d-cpu").css({'backgroundColor': `rgb(${color_red}, ${color_green}, 0)`})
                 $("#cpu-table tbody").append(bd);
             }
         }
@@ -325,7 +329,7 @@
                     cpu: _cpu.max
                 });
 
-                if (ALL_CPU.length > 80) {
+                if (ALL_CPU.length > 100) {
                     ALL_CPU.pop();
                 }
 
@@ -377,15 +381,6 @@
                 getWorld(planet.toLowerCase(), function(r) {
                     let data = r.rows[0];
                     $("#value").html(data.mine_bucket);
-
-                    if (DISABLE_GRAPH === false) {
-                        let value = Number(data.mine_bucket.replace(" TLM", ""));
-                        ALL_DATA.push(value);
-    
-                        if (ALL_DATA.length > MAX_COUNTER) {
-                            ALL_DATA.shift();
-                        }
-                    }
                 });
             }, 1000);
         }
@@ -401,6 +396,7 @@
             let dtLastMine = new Date(LAST_MINE + "+0000");
             dtLastMine.setTime(dtLastMine.getTime() + offsetDelay);
 
+            if (UPDATE_TABLE) updateGain();
             let cooldown = Math.floor((dtLastMine.getTime() - currentTime.getTime()) / 1000);
             if (cooldown <= 0) {
                 document.getElementById('cooldown').innerText = '00:00:00';
@@ -415,8 +411,6 @@
                     setTimeout(runTimer, 3000);
                 });
             } else {
-                UPDATE_GRAPH = false;
-                if (UPDATE_TABLE) updateGain();
                 WARN_COUNTER = 0;
                 let hour_left = String(Math.floor(cooldown / 3600)).padStart(2, '0');
                 let min_left = String(Math.floor((cooldown % 3600) / 60)).padStart(2, '0');
