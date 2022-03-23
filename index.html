@@ -412,6 +412,7 @@
                 });
             } else {
                 WARN_COUNTER = 0;
+                UPDATE_GRAPH = false;
                 let hour_left = String(Math.floor(cooldown / 3600)).padStart(2, '0');
                 let min_left = String(Math.floor((cooldown % 3600) / 60)).padStart(2, '0');
                 let sec_left = String(Math.floor(cooldown % 60)).padStart(2, '0');
