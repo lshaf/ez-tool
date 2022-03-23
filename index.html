@@ -58,6 +58,22 @@
         .data-container > div {
             min-width: 200px;
         }
+        #table-container {
+            flex-direction: column;
+        }
+        #table-container .nav-tab {
+            display: flex;
+            margin-bottom: 10px;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        #table-container .nav-tab .btn-tab {
+            flex-grow: 1;
+        }
+        .btn-full {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
         @media (max-width: 550px) {
             .data-container {
                 display: block;
@@ -92,13 +108,12 @@
                 <div class="other-info">
                     <div class="account-info">
                         CPU <span id="cpu-usage"></span>
-                        <div class="cpu-number small-info">0 / 0</div>
                     </div>
                     <div class="account-info">
-                        NET <span id="net-usage"></span>
+                        USED <span id="cpu-use"></span>
                     </div>
                     <div class="account-info">
-                        RAM <span id="ram-usage"></span>
+                        MAX <span id="cpu-max"></span>
                     </div>
                     <div class="account-info">
                         TLM <span id="tlm-fetch">0 TLM</span>
@@ -109,7 +124,15 @@
                 </div>
             </div>
             <div id="table-container" class="data-container">
-                <div id="table-data">
+                <div class="nav-tab">
+                    <button target="#table-data" class="btn-tab btn-full">
+                        Mine Table
+                    </button>
+                    <button target="#cpu-data" class="btn-tab btn-full">
+                        CPU Table
+                    </button>
+                </div>
+                <div id="table-data" class="table-tab">
                     <table class="table" id="template">
                         <thead>
                             <tr>
@@ -122,6 +145,18 @@
                                 <td class="d-time"></td>
                                 <td class="d-tlm"></td>
                             </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="cpu-data" class="table-tab" style="display: none;">
+                    <table class="table" id="cpu-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>CPU Max</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                         </tbody>
                     </table>
                 </div>
@@ -217,16 +252,14 @@
             player.currentTime = 0;
             player.play();
         }
-    </script>
-    <script>
-    </script>
-    <script>
+
         const QUERY = new URLSearchParams(window.location.search);
         const USERNAME = QUERY.get('user');
 
         const LIMIT_ALARM = 2;
         const MAX_COUNTER = 35;
         const ALL_DATA = [];
+        const ALL_CPU = [];
         const DISABLE_GRAPH = true;
 
         var WARN_COUNTER = 0;
@@ -237,19 +270,66 @@
         var UPDATE_TABLE = true;
         var UPDATE_GRAPH = false;
 
+        var CPU_STAKED_TH = 0;
+
         const strBodyTable = $("#template tbody tr").prop('outerHTML');
         $("#template tbody").empty();
+
+        function refreshCPUTable() {
+            $("#cpu-table tbody").empty();
+            let MIN_TH = CPU_STAKED_TH / 2;
+            for (let cpu of ALL_CPU) {
+                let bd = $(strBodyTable);
+                let strMineTime = cpu.time.toLocaleTimeString();
+                let strMineDate = cpu.time.toLocaleDateString('jpn', {dateStyle: 'medium'});
+
+                bd.find(".d-tlm").html(cpu.cpu.toLocaleString());
+                bd.find(".d-time").html(strMineTime + " - " + strMineDate);
+
+                let color_indicator = 512;
+                if (cpu <= MIN_TH) {
+                    color_indicator = 0;
+                } else if (cpu >= CPU_STAKED_TH) {
+                    color_indicator = 512;
+                } else {
+                    let gap_cpu = cpu.cpu - MIN_TH;
+                    color_indicator = Math.round(gap_cpu / MIN_TH * 512);
+                }
+
+                let color_decider = color_indicator - 256;
+                let color_red = 255;
+                let color_green = 255;
+
+                if (color_decider > 0) {
+                    color_red -= color_decider;
+                } else if (color_decider < 0) {
+                    color_green += color_decider;
+                }
+
+                bd.find(".d-tlm").css({'backgroundColor': `rgb(${color_red}, ${color_green}, 0)`})
+                $("#cpu-table tbody").append(bd);
+            }
+        }
 
         function updateAccount() {
             fetchAccount(USERNAME, r => {
                 let _cpu = r.cpu_limit;
                 let _net = r.net_limit;
                 $("#cpu-usage").html(Math.ceil(_cpu.used / _cpu.max * 100) + " %");
-                $(".cpu-number").html(`${_cpu.used.toLocaleString()} / ${_cpu.max.toLocaleString()}`);
-                $("#net-usage").html(Math.ceil(_net.used / _net.max * 100) + " %");
-                $("#ram-usage").html(Math.ceil(r.ram_usage / r.ram_quota * 100) + " %");
+                $("#cpu-use").html(_cpu.used.toLocaleString());
+                $("#cpu-max").html(_cpu.max.toLocaleString());
+                CPU_STAKED_TH = parseInt(r.cpu_weight) / 1000000;
 
-                setTimeout(updateAccount, 5000);
+                ALL_CPU.unshift({
+                    time: new Date(),
+                    cpu: _cpu.max
+                });
+
+                if (ALL_CPU.length > 80) {
+                    ALL_CPU.pop();
+                }
+
+                setTimeout(updateAccount, 1500);
             });
         }
 
@@ -346,6 +426,14 @@
                 setTimeout(runTimer, 250);
             }
         }
+
+        $(".btn-tab").on('click', function() {
+            let target = $(this).attr('target');
+            $(".table-tab").hide();
+            $(target).show();
+
+            if (target === "#cpu-data") refreshCPUTable();
+        });
 
         (() => {
             if (USERNAME === null) return false;
