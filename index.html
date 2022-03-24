@@ -264,11 +264,11 @@
         const MAX_COUNTER = 35;
         const ALL_CPU = [];
 
+        var CURRENT_PLANET = "";
         var WARN_COUNTER = 0;
         var LAND_DELAY = 0;
         var ITEM_DELAY = 0;
         var LAST_MINE = null;
-        var GLOBAL_GRAPH = null;
         var UPDATE_TABLE = true;
         var UPDATE_GRAPH = false;
 
@@ -369,20 +369,28 @@
             });
         }
 
+        function runTlmPot() {
+            if (!UPDATE_GRAPH) {
+                setTimeout(runTlmPot, 1000);
+                return true;
+            }
+
+            getWorld(CURRENT_PLANET.toLowerCase(), function(r) {
+                let data = r.rows[0];
+                $("#value").html(data.mine_bucket);
+
+                setTimeout(runTlmPot, 500);
+            });
+        }
+
         function setGlobalWorld(r) {
             let landName = r.data.name;
             let [land, planet] = landName.split(' on ');
             LAND_DELAY = r.data.data.delay / 10;
+            CURRENT_PLANET = planet;
 
-            $("#planet").html(planet + " World"); 
-
-            GLOBAL_GRAPH = setInterval(function() {
-                if (!UPDATE_GRAPH) return true;
-                getWorld(planet.toLowerCase(), function(r) {
-                    let data = r.rows[0];
-                    $("#value").html(data.mine_bucket);
-                });
-            }, 1000);
+            $("#planet").html(planet);
+            runTlmPot();
         }
 
         function runTimer() {
@@ -418,7 +426,7 @@
                 let sec_left = String(Math.floor(cooldown % 60)).padStart(2, '0');
                 let string_left = `${hour_left}:${min_left}:${sec_left}`;
                 document.getElementById('cooldown').innerText = string_left;
-                setTimeout(runTimer, 250);
+                setTimeout(runTimer, 500);
             }
         }
 
@@ -439,7 +447,7 @@
                 let data = r.rows[0];
                 let landID = data.current_land;
 
-                if (GLOBAL_GRAPH === null) fetchAsset(landID, setGlobalWorld);
+                fetchAsset(landID, setGlobalWorld);
                 LAST_MINE = data.last_mine;
             });
 
