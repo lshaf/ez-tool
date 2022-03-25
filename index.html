@@ -352,10 +352,9 @@
                     let bd = $(strBodyTable);
                     let mine_time = new Date(mining.block_timestamp);
                     let strMineTime = mine_time.toLocaleTimeString();
-                    let strMineDate = mine_time.toLocaleDateString('jpn', {dateStyle: 'medium'});
 
                     bd.find(".d-tlm").html(String(mining.bounty / 10000).padEnd(6, 0) + " TLM");
-                    bd.find(".d-time").html(strMineTime + " - " + strMineDate);
+                    bd.find(".d-time").html(strMineTime);
                     $("#template tbody").append(bd);
 
                     totalMine += mining.bounty;
