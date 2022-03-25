@@ -404,7 +404,6 @@
             let dtLastMine = new Date(LAST_MINE + "+0000");
             dtLastMine.setTime(dtLastMine.getTime() + offsetDelay);
 
-            if (UPDATE_TABLE) updateGain();
             let cooldown = Math.floor((dtLastMine.getTime() - currentTime.getTime()) / 1000);
             if (cooldown <= 0) {
                 document.getElementById('cooldown').innerText = '00:00:00';
@@ -421,6 +420,7 @@
             } else {
                 WARN_COUNTER = 0;
                 UPDATE_GRAPH = false;
+                if (UPDATE_TABLE) updateGain();
                 let hour_left = String(Math.floor(cooldown / 3600)).padStart(2, '0');
                 let min_left = String(Math.floor((cooldown % 3600) / 60)).padStart(2, '0');
                 let sec_left = String(Math.floor(cooldown % 60)).padStart(2, '0');
@@ -477,6 +477,7 @@
             });
 
             runTimer();
+            updateGain();
             updateAccount();
         })()
     </script>
