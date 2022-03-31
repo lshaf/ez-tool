@@ -466,12 +466,19 @@
                         delays.push(asset.data.data.delay);
                     }
 
-                    delays.sort((a, b) => a - b).reverse();
-                    if (delays.length > 2) {
-                        delays = delays.slice(0, 2);
+                    if (delays.length == 0) {
+                        ITEM_DELAY = 0;
+                    } else if (delays.length == 1) {
+                        ITEM_DELAY = delays[0];
+                    } else {
+                        delays.sort((a, b) => a - b).reverse();
+                        if (delays.length > 2) {
+                            delays = delays.slice(0, 2);
+                        }
+    
+                        halving = (delays.length == 2) ? 0.5 : 1;
+                        ITEM_DELAY = delays.reduce((a, b) => a + (b * halving));
                     }
-
-                    ITEM_DELAY = delays.reduce((a, b) => a + b);
                 });
             });
 
