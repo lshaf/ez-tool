@@ -475,7 +475,6 @@
                         halving = (delays.length == 2) ? 0.5 : 1;
                         if (delays.length > 2) delays = delays.slice(0, 2);
 
-                        console.log(delays, halving);
                         ITEM_DELAY = delays.reduce((a, b) => a + (b * halving));
                     }
                 });
